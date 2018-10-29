@@ -11,9 +11,10 @@
 
 Timeout="10"
 Test_URL="https://github.com"
-SSR_folder="/home/wind/opt/shadowsocksr/shadowsocks"
+SSR_folder="$PWD/ssr/shadowsocks"
 log_file="$PWD/ssr_check.log"
 config_file="$PWD/ssr_check.conf"
+LOCAL_PORT=1080
 
 Green_font_prefix="\033[32m" && Red_font_prefix="\033[31m" && Green_background_prefix="\033[42;37m" && Red_background_prefix="\033[41;37m" && Font_color_suffix="\033[0m"
 Info="${Green_font_prefix}[信息]${Font_color_suffix}" && Error="${Red_font_prefix}[错误]${Font_color_suffix}" && Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
@@ -207,9 +208,10 @@ Get_Like(){
 }
 Analysis_Config(){
 	Config_info_base64=$(echo -e "${Like}"|sed -n "$1"p)
+	echo $Config_info_base64
 	Config_info_base64_determine=$(echo -e ${Config_info_base64}|cut -c 1-6)
 	if [[ "${Config_info_base64_determine}" == "ssr://" ]]; then
-		Config_info=$(echo -e "${Config_info_base64}"|cut -c 7-2000|base64 -d)
+		Config_info=$(echo -e "${Config_info_base64}="|cut -c 7-2000|base64 -d)
 		if [[ -z ${Config_info} ]]; then
 			echo -e "${Error} Base64解密失败 [${Config_info_base64}] !" | tee -a ${log_file}
 			if [[ ${analysis_type} == "add" ]]; then
@@ -290,7 +292,8 @@ ssr_config(){
 	fi
 }
 Start_Client(){
-	nohup python "${SSR_folder}/local.py" -b "127.0.0.1" -l "${local_port}" -s "${ip}" -p "${port}" -k "${passwd}" -m "${method}" -O "${protocol}" -o "${obfs}" > /dev/null 2>&1 &
+	echo "python ${SSR_folder}/local.py -b 127.0.0.1 -l ${local_port} -s ${ip} -p ${port} -k ${passwd} -m ${method} -O ${protocol} -o ${obfs}"
+	nohup python "${SSR_folder}/local.py" -b "0.0.0.0" -l "${local_port}" -s "${ip}" -p "${port}" -k "${passwd}" -m "${method}" -O "${protocol}" -o "${obfs}" > /dev/null 2>&1 &
 	sleep 2s
 	PID=$(ps -ef |grep -v grep | grep "local.py" | grep "${local_port}" |awk '{print $2}')
 	if [[ -z ${PID} ]]; then
@@ -310,6 +313,30 @@ Socks5_test(){
 	else
 		echo -e "${Info} [${ip}] 检测成功，账号可用 !" | tee -a ${log_file}
 		Config_Status="true"
+	fi
+	kill -9 ${PID} 2>&1 > /dev/null
+	PID=$(ps -ef |grep -v grep | grep "local.py" | grep "${local_port}" |awk '{print $2}')
+	if [[ ! -z ${PID} ]]; then
+		echo -e "${Error} ShadowsocksR客户端 停止失败，请检查 !" | tee -a ${log_file}
+		if [[ ${analysis_type} == "add" ]]; then
+			exit_GG
+		else
+			continue
+		fi
+	fi
+	echo "---------------------------------------------------------"
+}
+Socks5_start(){
+	Test_results=$(curl --socks5 127.0.0.1:${local_port} -k -m ${Timeout} -s "${Test_URL}")
+	if [[ -z ${Test_results} ]]; then
+		echo -e "${Error} [${ip}] 检测失败，账号不可用 !" | tee -a ${log_file}
+		Config_Status="false"
+	else
+		echo -e "${Info} [${ip}] 检测成功，账号可用 !" | tee -a ${log_file}
+		Config_Status="true"
+        read -p 'press Enter to quit' n
+	    kill -9 ${PID}
+        exit 0
 	fi
 	kill -9 ${PID}
 	PID=$(ps -ef |grep -v grep | grep "local.py" | grep "${local_port}" |awk '{print $2}')
@@ -333,12 +360,35 @@ Test(){
 	GO
 	Get_Like
 	cd ${SSR_folder}
-	local_port=$(rand)
+	local_port=${LOCAL_PORT}
 	for((integer = 1; integer <= "${Like_num}"; integer++))
 	do
 		Analysis_Config "${integer}"
+        echo "IP:${ip}:${port}"
+        echo "passwd:${wd}"
+        echo "method:${method}"
+        echo "protocol:${protocol}"
+        echo "obfs:${obfs}"
 		Start_Client
 		Socks5_test
+	done
+	exit_GG
+}
+Start(){
+	GO
+	Get_Like
+	cd ${SSR_folder}
+	local_port=${LOCAL_PORT}
+	for((integer = 1; integer <= "${Like_num}"; integer++))
+	do
+		Analysis_Config "${integer}"
+        echo "IP:${ip}:${port}"
+        echo "passwd:${wd}"
+        echo "method:${method}"
+        echo "protocol:${protocol}"
+        echo "obfs:${obfs}"
+		Start_Client
+		Socks5_start
 	done
 	exit_GG
 }
@@ -360,6 +410,8 @@ action=$1
 debug=$2
 if [[ ${1} == "t" ]]; then
 	Test
+elif [[ ${1} == "s" ]]; then
+	Start
 elif [[ ${1} == "a" ]]; then
 	Test_add
 elif [[ ${1} == "log" ]]; then
@@ -367,3 +419,4 @@ elif [[ ${1} == "log" ]]; then
 else 
     Test
 fi
+
