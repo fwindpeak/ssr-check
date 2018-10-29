@@ -393,7 +393,7 @@ Start(){
 	do
 		Analysis_Config "${integer}"
         echo "IP:${ip}:${port}"
-        echo "passwd:${wd}"
+        echo "passwd:${passwd}"
         echo "method:${method}"
         echo "protocol:${protocol}"
         echo "obfs:${obfs}"
