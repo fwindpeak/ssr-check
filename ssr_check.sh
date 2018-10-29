@@ -15,6 +15,7 @@ SSR_folder="$PWD/ssr/shadowsocks"
 log_file="$PWD/ssr_check.log"
 config_file="$PWD/ssr_check.conf"
 LOCAL_PORT=1080
+SPEED_TEST_URL="https://github.com/fwindpeak/ssr-check/raw/master/1M"
 
 Green_font_prefix="\033[32m" && Red_font_prefix="\033[31m" && Green_background_prefix="\033[42;37m" && Red_background_prefix="\033[41;37m" && Font_color_suffix="\033[0m"
 Info="${Green_font_prefix}[信息]${Font_color_suffix}" && Error="${Red_font_prefix}[错误]${Font_color_suffix}" && Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
@@ -313,6 +314,10 @@ Socks5_test(){
 	else
 		echo -e "${Info} [${ip}] 检测成功，账号可用 !" | tee -a ${log_file}
 		Config_Status="true"
+        echo '网速测试中…………'
+        ping $ip -c 3
+        speed=$(curl -r 0-1048576 -L -w %{speed_download} -o/dev/null -s "$SPEED_TEST_URL")
+        echo $speed|awk '{printf("%.3fkb/s\n",$0/1000);}'
 	fi
 	kill -9 ${PID} 2>&1 > /dev/null
 	PID=$(ps -ef |grep -v grep | grep "local.py" | grep "${local_port}" |awk '{print $2}')
